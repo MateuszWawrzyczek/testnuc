@@ -181,12 +181,14 @@ int main(void)
     /* USER CODE BEGIN 3 */
 	  HAL_ADC_Start_DMA(&hadc1, AD_RES_BUFFER, 4);
 	  	  	              HAL_Delay(1);
+	  	  	              /*
 	  	  	              printf("ADC CH10: %.2fV, CH11: %.2fV, CH12: %.2fV, CH13: %.2fV\n\r",
 	  	  	                           (AD_RES_BUFFER[0] * 3.3f) / 4095.0f,
 	  	  	                           (AD_RES_BUFFER[1] * 3.3f) / 4095.0f,
 	  	  	                           (AD_RES_BUFFER[2] * 3.3f) / 4095.0f,
 	  	  	                           (AD_RES_BUFFER[3] * 3.3f) / 4095.0f);
 	  	  	       printf("A");
+	  	  	       */
   }
   /* USER CODE END 3 */
 }
@@ -276,43 +278,38 @@ static void MX_ADC1_Init(void)
     Error_Handler();
   }
 
-  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-  */
   sConfig.Channel = ADC_CHANNEL_10;
   sConfig.Rank = 1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_144CYCLES;
+  sConfig.SamplingTime = ADC_SAMPLETIME_480CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
-    Error_Handler();
+      Error_Handler();
   }
 
-  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-  */
   sConfig.Channel = ADC_CHANNEL_11;
   sConfig.Rank = 2;
+  sConfig.SamplingTime = ADC_SAMPLETIME_480CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
-    Error_Handler();
+      Error_Handler();
   }
 
-  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-  */
   sConfig.Channel = ADC_CHANNEL_12;
   sConfig.Rank = 3;
-  sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+  sConfig.SamplingTime = ADC_SAMPLETIME_480CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
-    Error_Handler();
+      Error_Handler();
   }
 
-  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-  */
   sConfig.Channel = ADC_CHANNEL_13;
   sConfig.Rank = 4;
+  sConfig.SamplingTime = ADC_SAMPLETIME_480CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
-    Error_Handler();
+      Error_Handler();
   }
+
   /* USER CODE BEGIN ADC1_Init 2 */
 
   /* USER CODE END ADC1_Init 2 */
