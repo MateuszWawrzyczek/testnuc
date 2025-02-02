@@ -180,15 +180,18 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 	  HAL_ADC_Start_DMA(&hadc1, AD_RES_BUFFER, 4);
-	  	  	              HAL_Delay(1);
-	  	  	              /*
-	  	  	              printf("ADC CH10: %.2fV, CH11: %.2fV, CH12: %.2fV, CH13: %.2fV\n\r",
+	    while (HAL_ADC_GetState(&hadc1) != HAL_ADC_STATE_READY);
+
+	    // ✅ Stop ADC after polling
+	    HAL_ADC_Stop_DMA(&hadc1);
+
+	  	printf("ADC CH10: %.2fV, CH11: %.2fV, CH12: %.2fV, CH13: %.2fV\n\r",
 	  	  	                           (AD_RES_BUFFER[0] * 3.3f) / 4095.0f,
 	  	  	                           (AD_RES_BUFFER[1] * 3.3f) / 4095.0f,
 	  	  	                           (AD_RES_BUFFER[2] * 3.3f) / 4095.0f,
 	  	  	                           (AD_RES_BUFFER[3] * 3.3f) / 4095.0f);
-	  	  	       printf("A");
-	  	  	       */
+	     printf("A");
+
   }
   /* USER CODE END 3 */
 }
