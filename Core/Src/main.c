@@ -199,7 +199,7 @@ int main(void)
 	  	  	                           (AD_RES_BUFFER[2] * 3.3f) / 4095.0f,
 	  	  	                           (AD_RES_BUFFER[3] * 3.3f) / 4095.0f);
 	  	  	       printf("A");*/
-	  	for (int i = 0;i<128;i++){
+	  	for (int i = 0;i<512;i++){
 	  		printf("%.2f\n\r", (tab[1] * 3.3f) / 4095.0f);
 	  	}
 	  	printf("\n\n\n\n\n");
@@ -248,7 +248,7 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV8;
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
   {
@@ -378,7 +378,7 @@ static void MX_ADC2_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_0;
   sConfig.Rank = 1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+  sConfig.SamplingTime = ADC_SAMPLETIME_28CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
   {
     Error_Handler();
