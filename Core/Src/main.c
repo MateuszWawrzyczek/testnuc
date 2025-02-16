@@ -18,7 +18,8 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-
+#include "toggle_pins.h"
+#include "arm_math.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
@@ -32,8 +33,15 @@ typedef struct {
     float rsib;
 } RSIValues;
 uint32_t AD_RES_BUFFER[4];
+#define FFT_SIZE 512
+#define SAMPLE_RATE  128000
 uint16_t AD_RES = 0;
-uint32_t tab[128];
+uint32_t tab[512];
+float tab_ADC[FFT_SIZE];
+//float tab_ADC_new[128];
+float fft_input[2*FFT_SIZE];
+float fft_output[FFT_SIZE ];
+float fft_amplitude[FFT_SIZE/2];
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -138,6 +146,42 @@ RSIValues read_rsi_values_scan(ADC_HandleTypeDef *hadc)
     return results;
 }
 
+void perform_fft(void) {
+    // Initialize RFFT instance
+    arm_rfft_fast_instance_f32 S;
+    if (arm_rfft_fast_init_f32(&S, FFT_SIZE) != ARM_MATH_SUCCESS) {
+        printf("FFT Initialization Error!\n\r");
+        return;
+    }
+
+    for (int i = 3;i<FFT_SIZE -3;i++){
+    	tab_ADC[i]=(tab_ADC[i-2]+tab_ADC[i-1]+tab_ADC[i]+tab_ADC[i+1]+tab_ADC[i+2])/5;
+    }
+
+    arm_rfft_fast_f32(&S, tab_ADC, fft_output, 0);
+
+
+    arm_cmplx_mag_f32(fft_output, fft_amplitude, FFT_SIZE / 2);
+
+    // Find the dominant frequency
+    float max_amplitude = 0.0f;
+    uint32_t max_index = 0;
+    for (int i = 2; i < FFT_SIZE / 2; i++) {
+        if (fft_amplitude[i] > max_amplitude) {
+            max_amplitude = fft_amplitude[i];
+            max_index = i;
+        }
+    }
+
+    // Compute the dominant frequency
+    float dominant_frequency = (float)max_index * SAMPLE_RATE / FFT_SIZE;
+
+    // Print results
+    printf("Dominant Frequency: %.2f Hz, Amplitude: %.3f\n\r", dominant_frequency, max_amplitude);
+}
+
+
+
 /* USER CODE END 0 */
 
 /**
@@ -154,7 +198,7 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
+	HAL_Init();
 
   /* USER CODE BEGIN Init */
 
@@ -182,15 +226,30 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  int32_t test_array[10] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  int32_t result = 0.0;
+  arm_mean_q31(test_array, 10, &result);
+
+/*
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_SET);
+*/
+
   HAL_DAC_Start(&hdac, DAC_CHANNEL_1);  // Włączenie DAC
   HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 1241);  // Ustawienie 1V
   HAL_ADC_Start(&hadc1);
-  HAL_ADC_Start_DMA(&hadc2, tab, 128);
+  HAL_ADC_Start_DMA(&hadc2, tab, 512);
+
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  toggle_pins();
 	  HAL_ADC_Start_DMA(&hadc1, AD_RES_BUFFER, 4);
 
 	  	  	             /* printf("ADC CH10: %.2fV, CH11: %.2fV, CH12: %.2fV, CH13: %.2fV\n\r",
@@ -199,10 +258,18 @@ int main(void)
 	  	  	                           (AD_RES_BUFFER[2] * 3.3f) / 4095.0f,
 	  	  	                           (AD_RES_BUFFER[3] * 3.3f) / 4095.0f);
 	  	  	       printf("A");*/
+
 	  	for (int i = 0;i<512;i++){
-	  		printf("%.2f\n\r", (tab[1] * 3.3f) / 4095.0f);
+	  		tab_ADC[i]=((tab[i] * 3.3f) / 4095.0f);
+	  		//printf("%.2f  %.2f\n\r",tab_ADC[i], (tab[1] * 3.3f) / 4095.0f);
 	  	}
-	  	printf("\n\n\n\n\n");
+	  	for (int i = 0;i<512	;i++){
+	  		//tab_ADC[i]=((tab[1] * 3.3f) / 4095.0f);
+	  		//printf("%.2f  \n\r",tab_ADC[i]);
+	  	}
+	  	//printf("\n\n\n\n\n");
+	  	perform_fft();
+
 	  	  	   HAL_Delay(1000);
 
   }
