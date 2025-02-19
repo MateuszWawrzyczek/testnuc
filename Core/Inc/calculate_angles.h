@@ -7,26 +7,25 @@
 
 #ifndef INC_CALCULATE_ANGLES_H_
 #define INC_CALCULATE_ANGLES_H_
-#include <math.h>
+
 typedef struct {
     float azimuth;
     float elevation;
 } AngleResults;
 
-AngleResults calculate_angles(const float cosAlpha[4], const float cosBeta[4])
+AngleResults calculate_angles(const float cosAlpha[4])
 {
     AngleResults results;
 
-
+    // Tutaj ustalasz, JAK łączysz dane z 4 pomiarów
+    // np. najprostszy pomysł: uśrednienie
     float sumAlpha = 0.0f;
     float sumBeta  = 0.0f;
-    for (int i = 0; i < 4; i++)
-    {
-        sumAlpha += cosAlpha[i];
-        sumBeta  += cosBeta[i];
-    }
-    float meanAlpha = sumAlpha / 4.0f;
-    float meanBeta  = sumBeta  / 4.0f;
+    sumAlpha = cosAlpha[0]+ cosAlpha[2];
+    sumAlpha = cosAlpha[1]+ cosAlpha[3];
+
+    float meanAlpha = sumAlpha / 2.0f;
+    float meanBeta  = sumBeta  / 2.0f;
 
     // Od tego miejsca - identyczna logika, jak w starej calculate_angles(...)
     float cos_alpha_squared = meanAlpha * meanAlpha;

@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
+#include <math.h>
 #include "arm_math.h"
 #include "toggle_pins.h"
 #include "temperature.h"
@@ -303,7 +304,8 @@ float Convert_Resistance_To_Temperature(float r_therm) {
 
 float Read_Thermistor_Temperature(void) {
     float v_out = AD_RES_BUFFER[1] ;
-    float r_therm = Get_Thermistor_Resistance(v_out);
+    float v_out1 = 0.9416f*((AD_RES_BUFFER[1] * 3.3f) / 4095.0f);
+    float r_therm = Get_Thermistor_Resistance(v_out1);
     float temp_celsius = Convert_Resistance_To_Temperature(r_therm);  // Oblicz temperaturę
 
     printf("Vout: %.3fV, Rtherm: %.1fΩ, Temp: %.2f°C\n\r", v_out, r_therm, temp_celsius);
@@ -319,11 +321,11 @@ void Control_Heater(void) {
     printf("Current temp: %.2f°C, Target: %.2f°C\n\r", current_temp, target_temp);
 
     if (current_temp < target_temp) {
-        Heater_On();
+        //Heater_On();
     } else {
-        Heater_Off();
+        //Heater_Off();
     }
-    dac_value++;
+    //dac_value++;
     //HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, dac_value);
 }
 
@@ -388,7 +390,7 @@ int main(void)
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_SET);
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_SET);
 */
-  HAL_TIM_PWM_START(&htim13,TIM_CHANNEL_1);
+  //HAL_TIM_PWM_START(&htim13,TIM_CHANNEL_1);
 
   dac_value = 1;
 
@@ -414,13 +416,13 @@ int main(void)
 		  Read_CPU_Temperature_DMA();
 		  printf("ADC CH10: %.2fV, CH11: %.2fV, CH12: %.2fV, CH13: %fV\n\r",
 		  	  	  	                           (AD_RES_BUFFER[0] * 3.3f) / 4095.0f,
-		  	  	  	                           (AD_RES_BUFFER[1] * 3.3f) / 4095.0f,
+		  	  	  	                           0.9416f*((AD_RES_BUFFER[1] * 3.3f) / 4095.0f),
 		  	  	  	                           (AD_RES_BUFFER[2] * 3.3f) / 4095.0f,
 		  	  	  	                           (AD_RES_BUFFER[4] * 3.3f) / 4095.0f);
 
 		  float detector_out = (AD_RES_BUFFER[2] * 3.3f) / 4095.0f;
 		  float input = 2.0f * (1.0f - (detector_out / Uoh)) + delta_err;
-		  float value = arm_asin_f32(input);
+		  float value = asinf(input);
 		  cos_alpha[i]= value;
 
 
@@ -435,7 +437,7 @@ int main(void)
 
 	  }
 	  AngleResults angle = calculate_angles(cos_alpha);
-	  _HAL_TIM_SET_COMPARE(&htim13,TIM_CHANNEL_1,1000);
+	  //_HAL_TIM_SET_COMPARE(&htim13,TIM_CHANNEL_1,1000);
 
 	  	for (int i = 0;i<512	;i++){
 	  		//tab_ADC[i]=((tab[1] * 3.3f) / 4095.0f);
