@@ -96,7 +96,7 @@ DMA_HandleTypeDef hdma_adc2;
 DAC_HandleTypeDef hdac;
 
 TIM_HandleTypeDef htim2;
-TIM_HandleTypeDef htim13;
+TIM_HandleTypeDef htim11;
 
 UART_HandleTypeDef huart2;
 
@@ -123,7 +123,7 @@ static void MX_DAC_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_ADC2_Init(void);
 static void MX_ADC3_Init(void);
-static void MX_TIM13_Init(void);
+static void MX_TIM11_Init(void);
 /* USER CODE BEGIN PFP */
 float read_voltage(ADC_HandleTypeDef *hadc, uint32_t channel);
 /* USER CODE END PFP */
@@ -331,6 +331,24 @@ void Control_Heater(void) {
 
 
 
+void Servo_SetAngle(int8_t angle) {
+    if (angle < -90) angle = -90;  // Ograniczenie zakresu
+    if (angle > 90) angle = 90;
+
+    // Przeliczenie kąta na szerokość impulsu (1000 µs do 2000 µs)
+    uint16_t pulse = 500 + ((angle * 500) / 90);  // 1.5 ms ± 0.5 ms
+
+    // Ustawienie wartości PWM
+    __HAL_TIM_SET_COMPARE(&htim11, TIM_CHANNEL_1, pulse);
+	  //HAL_Delay(10000);
+
+}
+
+
+void Servo_Init() {
+    HAL_TIM_PWM_Start(&htim11, TIM_CHANNEL_1);  // Uruchomienie PWM na TIM11_CH1
+    Servo_SetAngle(0);  // Start w pozycji neutralnej (0°)
+}
 
 
 /* USER CODE END 0 */
@@ -371,7 +389,7 @@ int main(void)
   MX_TIM2_Init();
   MX_ADC2_Init();
   MX_ADC3_Init();
-  MX_TIM13_Init();
+  MX_TIM11_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -382,15 +400,15 @@ int main(void)
   int32_t result = 0.0;
   arm_mean_q31(test_array, 10, &result);
 
-/*
+
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_SET);
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_SET);
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_SET);
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, GPIO_PIN_SET);
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_SET);
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_SET);
-*/
-  //HAL_TIM_PWM_START(&htim13,TIM_CHANNEL_1);
+
+  HAL_TIM_PWM_Start(&htim11,TIM_CHANNEL_1);
 
   dac_value = 1;
 
@@ -403,6 +421,8 @@ int main(void)
   }
   HAL_ADC_Start_DMA(&hadc1, AD_RES_BUFFER, 5);
   Read_CPU_Temperature_DMA();
+
+  Servo_Init();
   while (1)
   {
     /* USER CODE END WHILE */
@@ -437,8 +457,9 @@ int main(void)
 
 	  }
 	  AngleResults angle = calculate_angles(cos_alpha);
-	  //_HAL_TIM_SET_COMPARE(&htim13,TIM_CHANNEL_1,1000);
-
+	  Servo_SetAngle(30);
+	  HAL_Delay(1000);
+	  Servo_SetAngle(-30);
 	  	for (int i = 0;i<512	;i++){
 	  		//tab_ADC[i]=((tab[1] * 3.3f) / 4095.0f);
 	  		//printf("%.2f  \n\r",tab_ADC[i]);
@@ -793,33 +814,33 @@ static void MX_TIM2_Init(void)
 }
 
 /**
-  * @brief TIM13 Initialization Function
+  * @brief TIM11 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_TIM13_Init(void)
+static void MX_TIM11_Init(void)
 {
 
-  /* USER CODE BEGIN TIM13_Init 0 */
+  /* USER CODE BEGIN TIM11_Init 0 */
 
-  /* USER CODE END TIM13_Init 0 */
+  /* USER CODE END TIM11_Init 0 */
 
   TIM_OC_InitTypeDef sConfigOC = {0};
 
-  /* USER CODE BEGIN TIM13_Init 1 */
+  /* USER CODE BEGIN TIM11_Init 1 */
 
-  /* USER CODE END TIM13_Init 1 */
-  htim13.Instance = TIM13;
-  htim13.Init.Prescaler = 71;
-  htim13.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim13.Init.Period = 65535;
-  htim13.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim13.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
-  if (HAL_TIM_Base_Init(&htim13) != HAL_OK)
+  /* USER CODE END TIM11_Init 1 */
+  htim11.Instance = TIM11;
+  htim11.Init.Prescaler = 71;
+  htim11.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim11.Init.Period = 2000;
+  htim11.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim11.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim11) != HAL_OK)
   {
     Error_Handler();
   }
-  if (HAL_TIM_PWM_Init(&htim13) != HAL_OK)
+  if (HAL_TIM_PWM_Init(&htim11) != HAL_OK)
   {
     Error_Handler();
   }
@@ -827,14 +848,14 @@ static void MX_TIM13_Init(void)
   sConfigOC.Pulse = 0;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  if (HAL_TIM_PWM_ConfigChannel(&htim13, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  if (HAL_TIM_PWM_ConfigChannel(&htim11, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN TIM13_Init 2 */
+  /* USER CODE BEGIN TIM11_Init 2 */
 
-  /* USER CODE END TIM13_Init 2 */
-  HAL_TIM_MspPostInit(&htim13);
+  /* USER CODE END TIM11_Init 2 */
+  HAL_TIM_MspPostInit(&htim11);
 
 }
 
@@ -908,7 +929,10 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, LD2_Pin|GPIO_PIN_8|GPIO_PIN_9|GPIO_PIN_10, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7|GPIO_PIN_8|GPIO_PIN_9, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
@@ -916,12 +940,19 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : LD2_Pin */
-  GPIO_InitStruct.Pin = LD2_Pin;
+  /*Configure GPIO pins : LD2_Pin PA8 PA9 PA10 */
+  GPIO_InitStruct.Pin = LD2_Pin|GPIO_PIN_8|GPIO_PIN_9|GPIO_PIN_10;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PC7 PC8 PC9 */
+  GPIO_InitStruct.Pin = GPIO_PIN_7|GPIO_PIN_8|GPIO_PIN_9;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
