@@ -49,17 +49,18 @@ typedef struct {
 Candidate candidate_list[MAX_CANDIDATES];  // Tablica do zapisu
 int candidate_count = 0;
 uint32_t AD_RES_BUFFER[5];
-#define FFT_SIZE 512
-#define SAMPLE_RATE  128000
+
 uint16_t AD_RES = 0;
 uint32_t tab[512];
 float tab_ADC[FFT_SIZE];
-//float tab_ADC_new[128];
 float fft_input[2*FFT_SIZE];
 float fft_output[FFT_SIZE ];
 float fft_amplitude[FFT_SIZE/2];
 float temper;
 uint32_t dac_value;
+
+#define FFT_SIZE 512
+#define SAMPLE_RATE  128000
 
 #define V25      0.76f  // V25 w Voltach
 #define AVG_SLOPE 0.0025f  // 2.5mV/°C = 0.0025 V/°C
@@ -95,6 +96,8 @@ DMA_HandleTypeDef hdma_adc2;
 
 DAC_HandleTypeDef hdac;
 
+SPI_HandleTypeDef hspi2;
+
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim11;
 
@@ -105,8 +108,7 @@ int _write(int file, char *ptr, int len)
 {
     if (HAL_UART_Transmit(&huart2, (uint8_t *)ptr, len, HAL_MAX_DELAY) != HAL_OK)
     {
-        // Optionally handle error, but do *not* call printf here!
-        return -1;  // Indicate error
+        return -1;
     }
     return len;
 }
@@ -124,6 +126,7 @@ static void MX_TIM2_Init(void);
 static void MX_ADC2_Init(void);
 static void MX_ADC3_Init(void);
 static void MX_TIM11_Init(void);
+static void MX_SPI2_Init(void);
 /* USER CODE BEGIN PFP */
 float read_voltage(ADC_HandleTypeDef *hadc, uint32_t channel);
 /* USER CODE END PFP */
@@ -204,31 +207,39 @@ void perform_fft(void) {
             max_index = i;
         }
     }
+    float amplitude_sum = 0;
+    for (int i = 0; i < FFT_SIZE / 2; i++) {
+    	amplitude_sum+= fft_amplitude[i];
 
+    }
+	float average_amplitude = amplitude_sum/FFT_SIZE;
+	printf("Amplitude: %.3f,", max_amplitude/average_amplitude);
     // Compute the dominant frequency
     float dominant_frequency = (float)max_index * SAMPLE_RATE / FFT_SIZE;
 
-    // Print results
-    //printf("Dominant Frequency: %.2f Hz, Amplitude: %.3f\n\r", dominant_frequency, max_amplitude);
+
+    //printf("Dominant Frequency: %.2f Hz,/t Amplitude: %.3f\n\r", dominant_frequency, max_amplitude);
+    printf("Max_AMplitude: %.3f,", max_amplitude);
+    printf("Frequency: %.3f, ", dominant_frequency);
+
 }
 
 
 void analyze_fft_results(void) {
-    int idx_1khz = (1000 * FFT_SIZE) / SAMPLE_RATE;  // Indeks składowej 1 kHz
+    int idx_1khz = (1000 * FFT_SIZE) / SAMPLE_RATE;
 
-    // Oblicz średnią amplitudę składowych
     float mean_amp = 0.0f;
-    for (int i = 1; i < FFT_SIZE / 2; i++) {  // Pomijamy DC (i=0)
+    for (int i = 1; i < FFT_SIZE / 2; i++) {
         mean_amp += fft_amplitude[i];
     }
-    mean_amp /= (FFT_SIZE / 2 - 1);  // Średnia amplitud składowych
+    mean_amp /= (FFT_SIZE / 2 - 1);
 
-    float amp_1khz = fft_amplitude[idx_1khz];  // Pobierz amplitudę 1 kHz
-    float ratio = amp_1khz / mean_amp;  // Oblicz stosunek amplitudy 1 kHz do średniej
+    float amp_1khz = fft_amplitude[idx_1khz];
+    float ratio = amp_1khz / mean_amp;
 
-    // Sprawdź, czy mamy mniej niż 10 kandydatów
+
     if (candidate_count < MAX_CANDIDATES) {
-        // Dodaj nowego kandydata
+
         candidate_list[candidate_count].freq_est = (float) idx_1khz * SAMPLE_RATE / FFT_SIZE;
         candidate_list[candidate_count].dac_setting = HAL_DAC_GetValue(&hdac, DAC_CHANNEL_1);
         candidate_list[candidate_count].vco_temp = read_voltage(&hadc3, ADC_CHANNEL_1);
@@ -237,7 +248,6 @@ void analyze_fft_results(void) {
         candidate_list[candidate_count].ratio = ratio;
         candidate_count++;
     } else {
-        // Szukamy najsłabszego kandydata (najmniejszy stosunek R)
         int worst_index = 0;
         float min_ratio = candidate_list[0].ratio;
         for (int i = 1; i < MAX_CANDIDATES; i++) {
@@ -247,7 +257,6 @@ void analyze_fft_results(void) {
             }
         }
 
-        // Jeśli nowy kandydat ma lepszy stosunek R, zastępujemy najgorszy
         if (ratio > min_ratio) {
             candidate_list[worst_index].freq_est = (float) idx_1khz * SAMPLE_RATE / FFT_SIZE;
             candidate_list[worst_index].dac_setting = HAL_DAC_GetValue(&hdac, DAC_CHANNEL_1);
@@ -258,7 +267,6 @@ void analyze_fft_results(void) {
         }
     }
 
-    // Debug: wypisz listę kandydatów
     //printf("Lista najlepszych kandydatów:\n\r");
     for (int i = 0; i < candidate_count; i++) {
         /*printf("[%d] f=%.2f Hz, DAC=%d, Temp=%.2f, Amp1kHz=%.2f, MeanAmp=%.2f, R=%.2f\n\r",
@@ -273,23 +281,23 @@ void analyze_fft_results(void) {
 }
 void Read_CPU_Temperature_DMA(void) {
     uint32_t rawValue = AD_RES_BUFFER[3];
-    printf("%lu\n\r",AD_RES_BUFFER[3]);
+    //printf("%lu\n\r",AD_RES_BUFFER[3]);
     float v_sense = ((float)rawValue * 3.3f) / 4095.0f;  // Przeliczenie ADC na napięcie
-    printf("v_sense %f.......",v_sense);
+    //printf("v_sense %f.......",v_sense);
     float temperature = ((v_sense - V25) / AVG_SLOPE) + 25.0f;
 
-    printf("CPU Temp: %.2f°C\n\r", temperature);
+    //printf("CPU Temp: %.2f°C\n\r", temperature);
     temper=temperature;
 }
 
 void Heater_On(void) {
     printf("Grzałka ON\n\r");
-    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_SET);  // Włącz grzałkę
+    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_SET);  // Turn on heater
 }
 
 void Heater_Off(void) {
     printf("Grzałka OFF\n\r");
-    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_RESET);  // Wyłącz grzałkę
+    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_RESET);  // Turn off heater
 }
 
 float Get_Thermistor_Resistance(float v_out) {
@@ -299,7 +307,7 @@ float Get_Thermistor_Resistance(float v_out) {
 float Convert_Resistance_To_Temperature(float r_therm) {
     float temperature_kelvin = B_COEFFICIENT /
         (log(r_therm / R25) + (B_COEFFICIENT / T25));
-    return temperature_kelvin - 273.15f;  // Konwersja do °C
+    return temperature_kelvin - 273.15f;  // Conversion to °C
 }
 
 float Read_Thermistor_Temperature(void) {
@@ -308,7 +316,7 @@ float Read_Thermistor_Temperature(void) {
     float r_therm = Get_Thermistor_Resistance(v_out1);
     float temp_celsius = Convert_Resistance_To_Temperature(r_therm);  // Oblicz temperaturę
 
-    printf("Vout: %.3fV, Rtherm: %.1fΩ, Temp: %.2f°C\n\r", v_out, r_therm, temp_celsius);
+    //printf("Vout: %.3fV, Rtherm: %.1fΩ, Temp: %.2f°C\n\r", v_out, r_therm, temp_celsius);
 
     return temp_celsius;
 }
@@ -318,27 +326,24 @@ float Read_Thermistor_Temperature(void) {
 void Control_Heater(void) {
     float current_temp = Read_Thermistor_Temperature();
     float target_temp = temper+2.0f;
-    printf("Current temp: %.2f°C, Target: %.2f°C\n\r", current_temp, target_temp);
+    //printf("Current temp: %.2f°C, Target: %.2f°C\n\r", current_temp, target_temp);
 
     if (current_temp < target_temp) {
         //Heater_On();
     } else {
         //Heater_Off();
     }
-    //dac_value++;
-    //HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, dac_value);
+
 }
 
 
 
 void Servo_SetAngle(int8_t angle) {
-    if (angle < -90) angle = -90;  // Ograniczenie zakresu
+    if (angle < -90) angle = -90;
     if (angle > 90) angle = 90;
 
-    // Przeliczenie kąta na szerokość impulsu (1000 µs do 2000 µs)
     uint16_t pulse = 500 + ((angle * 500) / 90);  // 1.5 ms ± 0.5 ms
 
-    // Ustawienie wartości PWM
     __HAL_TIM_SET_COMPARE(&htim11, TIM_CHANNEL_1, pulse);
 	  //HAL_Delay(10000);
 
@@ -390,6 +395,7 @@ int main(void)
   MX_ADC2_Init();
   MX_ADC3_Init();
   MX_TIM11_Init();
+  MX_SPI2_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -413,7 +419,7 @@ int main(void)
   dac_value = 1;
 
   HAL_DAC_Start(&hdac, DAC_CHANNEL_1);  // Włączenie DAC
-  HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 1241);  // Ustawienie 1V
+  //HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, 1241);  // Ustawienie 1V
   HAL_ADC_Start(&hadc1);
   HAL_ADC_Start_DMA(&hadc2, tab, 512);
   if (HAL_ADC_Start_DMA(&hadc1, AD_RES_BUFFER, 5) != HAL_OK) {
@@ -421,7 +427,7 @@ int main(void)
   }
   HAL_ADC_Start_DMA(&hadc1, AD_RES_BUFFER, 5);
   Read_CPU_Temperature_DMA();
-
+  perform_fft();
   Servo_Init();
   while (1)
   {
@@ -429,17 +435,24 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 	  float cos_alpha[4];
+	    dac_value++;
+	    if(dac_value>4094){
+	    	dac_value=1;
+	    }
+	    HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_12B_R, dac_value);
+	    //HAL_Deley(1);
 
 	  for (int i =1;i<4;i++){
 		  toggle_pins();
 		  HAL_ADC_Start_DMA(&hadc1, AD_RES_BUFFER, 5);
 		  Read_CPU_Temperature_DMA();
-		  printf("ADC CH10: %.2fV, CH11: %.2fV, CH12: %.2fV, CH13: %fV\n\r",
+		  printf("DAC:%f,",(dac_value * 3.3f) / 4095.0f);
+		  /*printf("ADC CH10: %.2fV,\t CH11: %.2fV,\t CH12: %.2fV,\t CH13: %fV\n\r",
 		  	  	  	                           (AD_RES_BUFFER[0] * 3.3f) / 4095.0f,
 		  	  	  	                           0.9416f*((AD_RES_BUFFER[1] * 3.3f) / 4095.0f),
 		  	  	  	                           (AD_RES_BUFFER[2] * 3.3f) / 4095.0f,
 		  	  	  	                           (AD_RES_BUFFER[4] * 3.3f) / 4095.0f);
-
+*/
 		  float detector_out = (AD_RES_BUFFER[2] * 3.3f) / 4095.0f;
 		  float input = 2.0f * (1.0f - (detector_out / Uoh)) + delta_err;
 		  float value = asinf(input);
@@ -454,12 +467,11 @@ int main(void)
 
 		  perform_fft();
 		  analyze_fft_results();
+		  printf("\n\r");
 
 	  }
 	  AngleResults angle = calculate_angles(cos_alpha);
-	  Servo_SetAngle(30);
-	  HAL_Delay(1000);
-	  Servo_SetAngle(-30);
+
 	  	for (int i = 0;i<512	;i++){
 	  		//tab_ADC[i]=((tab[1] * 3.3f) / 4095.0f);
 	  		//printf("%.2f  \n\r",tab_ADC[i]);
@@ -467,8 +479,10 @@ int main(void)
 
 
 	  	Control_Heater();
-	  	HAL_Delay(1000);
 
+	  	//DAC AD5641???
+	  	uint8_t spi_data[2] = {0x13, 0x66}; // Example data
+	  	HAL_SPI_Transmit(&hspi2, spi_data, 2, 100);
 
   }
   /* USER CODE END 3 */
@@ -753,6 +767,44 @@ static void MX_DAC_Init(void)
   /* USER CODE BEGIN DAC_Init 2 */
 
   /* USER CODE END DAC_Init 2 */
+
+}
+
+/**
+  * @brief SPI2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI2_Init(void)
+{
+
+  /* USER CODE BEGIN SPI2_Init 0 */
+
+  /* USER CODE END SPI2_Init 0 */
+
+  /* USER CODE BEGIN SPI2_Init 1 */
+
+  /* USER CODE END SPI2_Init 1 */
+  /* SPI2 parameter configuration*/
+  hspi2.Instance = SPI2;
+  hspi2.Init.Mode = SPI_MODE_MASTER;
+  hspi2.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi2.Init.NSS = SPI_NSS_HARD_OUTPUT;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi2.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hspi2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI2_Init 2 */
+
+  /* USER CODE END SPI2_Init 2 */
 
 }
 

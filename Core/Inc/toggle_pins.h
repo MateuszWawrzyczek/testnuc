@@ -20,7 +20,7 @@ void toggle_pins(void) {
             HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, GPIO_PIN_RESET); // PB10 LOW
 
             break;
-        case 1:
+        /*case 1:
             HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);  // PB0 LOW
             HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);    // PB1 HIGH
             HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);  // PB2 HIGH
@@ -37,10 +37,10 @@ void toggle_pins(void) {
             HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);  // PB1 LOW
             HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);  // PB2 LOW
             HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, GPIO_PIN_SET);   // PB10 HIGH
-            break;
+            break;*/
     }
 
-    state = (state + 1) % 4;
+    //state = (state + 1) % 4;
 
     HAL_Delay(1000);
 }
