@@ -17,8 +17,6 @@ AngleResults calculate_angles(const float cosAlpha[4])
 {
     AngleResults results;
 
-    // Tutaj ustalasz, JAK łączysz dane z 4 pomiarów
-    // np. najprostszy pomysł: uśrednienie
     float sumAlpha = 0.0f;
     float sumBeta  = 0.0f;
     sumAlpha = cosAlpha[0]+ cosAlpha[2];
@@ -27,27 +25,21 @@ AngleResults calculate_angles(const float cosAlpha[4])
     float meanAlpha = sumAlpha / 2.0f;
     float meanBeta  = sumBeta  / 2.0f;
 
-    // Od tego miejsca - identyczna logika, jak w starej calculate_angles(...)
     float cos_alpha_squared = meanAlpha * meanAlpha;
     float cos_beta_squared  = meanBeta  * meanBeta;
 
-    // Warunek sprawdzający, czy nie przekraczamy 1 (czy istnieje rozwiązanie):
     if (cos_alpha_squared + cos_beta_squared > 1.0f) {
-        // Brak geometrycznego przecięcia stożków => błąd pomiaru
         results.azimuth = 0.0f;
         results.elevation = 0.0f;
         return results;
     }
 
-    // Wyliczenie "x, y, z" wg Twoich wzorów
     float x = meanAlpha;
     float y = meanBeta;
     float z = sqrtf(1.0f - cos_alpha_squared - cos_beta_squared);
 
-    // azimuth = atan2(x, y) => jak w Twoim kodzie
     results.azimuth = atan2f(x, y) * (180.0f / M_PI);
 
-    // elevation = atan2(z, sqrt(x^2 + y^2)) lub arcsin(z) => jak w Twoim kodzie
     results.elevation = atan2f(z, sqrtf(x*x + y*y)) * (180.0f / M_PI);
 
     return results;
